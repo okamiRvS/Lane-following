@@ -2,6 +2,7 @@
 import rospy
 from thymio import ThymioController, PID
 from sensor_msgs.msg import Range, Image
+import pdb
 
 import cv2
 import numpy as np
@@ -29,9 +30,15 @@ class Task1(ThymioController):
 
             # crop the image to make process much faster
             height, width, channels = cv_image.shape
-            descentre = 160
-            rows_to_watch = 20
-            crop_img = cv_image[(height) / 2+descentre:(height) / 2+(descentre+rows_to_watch)][1:width]
+            crop_img = cv_image[height-200::,:,:]
+
+            # convert from RGB to HSV
+            hsv = cv2.cvtColor(crop_img, cv2.COLOR_BGR2HSV)
+
+            # get blue lines
+            
+
+            pdb.set_trace()
         except CvBridgeError as e:
             print(e)
         
