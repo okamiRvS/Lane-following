@@ -24,6 +24,8 @@ class Task1(ThymioController):
 
         self.image_sub = rospy.Subscriber("/thymio10/camera/image_raw", Image, self.camera_callback)
         self.cv_image = None
+        self.speed = 1
+        self.onmarking = False
 
     def camera_callback(self, data):
         try:
@@ -45,7 +47,35 @@ class Task1(ThymioController):
                 # crop the image to make process much faster
                 height, width, channels = self.cv_image.shape
                 cropxSize = 100
-                crop_img = self.cv_image[height-cropxSize::,:]
+                crop_img = self.cv_image[height-cropxSize-30:height-30:,:]
+
+                #detect lines
+                RGB_green = [0,176,80]
+                BGR_green = np.uint8([[[RGB_green[2], RGB_green[1], RGB_green[0]]]])
+                HSV_green = cv2.cvtColor(BGR_green, cv2.COLOR_BGR2HSV)[0][0]
+                lower_green = np.array([HSV_green[0]-15, HSV_green[1]-15, HSV_green[2]-15])
+                upper_green = np.array([HSV_green[0]+15, HSV_green[1]+15, HSV_green[2]+15])
+                RGB_red = [255,0,0]
+                BGR_red = np.uint8([[[RGB_red[2], RGB_red[1], RGB_red[0]]]])
+                HSV_red = cv2.cvtColor(BGR_red, cv2.COLOR_BGR2HSV)[0][0]
+                lower_red = np.array([HSV_red[0]-15, HSV_red[1]-15, HSV_red[2]-15])
+                upper_red = np.array([HSV_red[0]+15, HSV_red[1]+15, HSV_red[2]+15])
+                crop_img_low = self.cv_image[height-30::,int(width/2)-50:int(width/2)+50]
+                hsv_low = cv2.cvtColor(crop_img_low, cv2.COLOR_BGR2HSV)
+                mask_green = cv2.inRange(hsv_low, lower_green, upper_green)
+                mask_red = cv2.inRange(hsv_low, lower_red, upper_red)
+                threshold = 100
+                if np.sum(mask_green) > threshold and not self.onmarking:
+                    self.speed += 0.5
+                    self.onmarking = True
+                    print("speed up")
+                elif np.sum(mask_red) > threshold and not self.onmarking:
+                    self.speed -= 0.5
+                    self.onmarking = True
+                    print("speed down")
+                if self.onmarking and np.sum(mask_red) ==0 and np.sum(mask_green) ==0:
+                    self.onmarking = False
+
 
                 # convert RGB blue to BGR blue
                 RGB_blue = [58,99,173]
@@ -55,6 +85,7 @@ class Task1(ThymioController):
                 HSV_blue = cv2.cvtColor(BGR_blue, cv2.COLOR_BGR2HSV)[0][0]
                 lower_blue = np.array([HSV_blue[0]-15, HSV_blue[1]-15, HSV_blue[2]-15])
                 upper_blue = np.array([HSV_blue[0]+15, HSV_blue[1]+15, HSV_blue[2]+15])
+
 
                 # convert from RGB to HSV
                 hsv = cv2.cvtColor(crop_img, cv2.COLOR_BGR2HSV)
@@ -105,12 +136,12 @@ class Task1(ThymioController):
                         boost = 2
 
                     if cx1 - orientationPoint[0] < 0:
-                        print("turn right.")
-                        self.vel_msg.linear.x = .12
+                        print("turn right")
+                        self.vel_msg.linear.x = .12 * self.speed
                         self.vel_msg.angular.z = -.2 * boost
                     elif cx1 - orientationPoint[0] >= 0:
                         print("turn left")
-                        self.vel_msg.linear.x = .12
+                        self.vel_msg.linear.x = .12 * self.speed
                         self.vel_msg.angular.z = .2 * boost
 
                 elif len(contours) > 1:
@@ -148,15 +179,15 @@ class Task1(ThymioController):
 
                     if int(width/2) - centerx > 10:
                         print("turn left")
-                        self.vel_msg.linear.x = .15
+                        self.vel_msg.linear.x = .15 * self.speed
                         self.vel_msg.angular.z = .1
                     elif int(width/2) - centerx < -10:
                         print("turn right")
-                        self.vel_msg.linear.x = .15
+                        self.vel_msg.linear.x = .15 * self.speed
                         self.vel_msg.angular.z = -.1
                     else:
                         print("I'm in the center")
-                        self.vel_msg.linear.x = .2
+                        self.vel_msg.linear.x = .2 * self.speed
                         self.vel_msg.angular.z = 0
 
                 self.velocity_publisher.publish(self.vel_msg)
