@@ -105,7 +105,7 @@ class Task1(ThymioController):
                         boost = 2
 
                     if cx1 - orientationPoint[0] < 0:
-                        print("turn right")
+                        print("turn right.")
                         self.vel_msg.linear.x = .12
                         self.vel_msg.angular.z = -.2 * boost
                     elif cx1 - orientationPoint[0] >= 0:
