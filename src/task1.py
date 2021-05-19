@@ -41,13 +41,13 @@ class Task1(ThymioController):
             self.sleep()
             if self.cv_image is not None:
                 break
-
+        self.lastspeedupdate = rospy.Time.now().to_nsec() - 10**9
         while not rospy.is_shutdown():           
             try:
                 # crop the image to make process much faster
                 height, width, channels = self.cv_image.shape
                 cropxSize = 100
-                crop_img = self.cv_image[height-cropxSize-30:height-30:,:]
+                crop_img = self.cv_image[height-cropxSize-25:height-25:,:]
 
                 #detect lines
                 RGB_green = [0,176,80]
@@ -60,18 +60,21 @@ class Task1(ThymioController):
                 HSV_red = cv2.cvtColor(BGR_red, cv2.COLOR_BGR2HSV)[0][0]
                 lower_red = np.array([HSV_red[0]-15, HSV_red[1]-15, HSV_red[2]-15])
                 upper_red = np.array([HSV_red[0]+15, HSV_red[1]+15, HSV_red[2]+15])
-                crop_img_low = self.cv_image[height-30::,int(width/2)-50:int(width/2)+50]
+                crop_img_low = self.cv_image[height-10::,int(width/2)-50:int(width/2)+50]
                 hsv_low = cv2.cvtColor(crop_img_low, cv2.COLOR_BGR2HSV)
                 mask_green = cv2.inRange(hsv_low, lower_green, upper_green)
                 mask_red = cv2.inRange(hsv_low, lower_red, upper_red)
                 threshold = 100
-                if np.sum(mask_green) > threshold and not self.onmarking:
+                timenow = rospy.Time.now().to_nsec()
+                if (timenow - self.lastspeedupdate > 10**9) and np.sum(mask_green) > threshold and not self.onmarking:
                     self.speed += 0.5
                     self.onmarking = True
+                    self.lastspeedupdate = timenow
                     print("speed up")
-                elif np.sum(mask_red) > threshold and not self.onmarking:
+                elif (timenow - self.lastspeedupdate > 10**9) and np.sum(mask_red) > threshold and not self.onmarking:
                     self.speed -= 0.5
                     self.onmarking = True
+                    self.lastspeedupdate = timenow
                     print("speed down")
                 if self.onmarking and np.sum(mask_red) ==0 and np.sum(mask_green) ==0:
                     self.onmarking = False
