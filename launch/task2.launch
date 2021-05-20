@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="name" default="thymio10"/>
+
+    <node name="task2" pkg="ros-streetwalk" type="task2.py" output="screen">
+        <param name="name" value="$(arg name)"/>
+    </node>
+</launch>
