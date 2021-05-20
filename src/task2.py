@@ -79,6 +79,31 @@ class Task2(ThymioController):
                 if self.onmarking and np.sum(mask_red) ==0 and np.sum(mask_green) ==0:
                     self.onmarking = False
 
+                ###################
+
+                # convert RGB black to BGR black
+                RGB_black = [12,12,12]
+                BGR_black = np.uint8([[[RGB_black[2], RGB_black[1], RGB_black[0]]]])
+
+                # get HSV black and a range 
+                HSV_black = cv2.cvtColor(BGR_black, cv2.COLOR_BGR2HSV)[0][0]
+                lower_black = np.array([HSV_black[0]-12, HSV_black[1]-12, HSV_black[2]-12])
+                upper_black = np.array([HSV_black[0]+12, HSV_black[1]+12, HSV_black[2]+12])
+
+                # convert from RGB to HSV
+                hsv = cv2.cvtColor(crop_img, cv2.COLOR_BGR2HSV)
+
+                # apply a mask
+                mask = cv2.inRange(hsv, lower_black, upper_black)
+
+                kernel = np.ones((5, 5), np.uint8)
+                blur = cv2.blur(mask, (5,5))
+                erosion_black = cv2.erode(blur, kernel, iterations=1)
+
+                # find contours
+                black_contours, hierarchy = cv2.findContours(erosion_black, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+                ####################
 
                 # convert RGB blue to BGR blue
                 RGB_blue = [58,99,173]
@@ -89,7 +114,6 @@ class Task2(ThymioController):
                 lower_blue = np.array([HSV_blue[0]-15, HSV_blue[1]-15, HSV_blue[2]-15])
                 upper_blue = np.array([HSV_blue[0]+15, HSV_blue[1]+15, HSV_blue[2]+15])
 
-
                 # convert from RGB to HSV
                 hsv = cv2.cvtColor(crop_img, cv2.COLOR_BGR2HSV)
 
@@ -99,7 +123,6 @@ class Task2(ThymioController):
                 kernel = np.ones((5, 5), np.uint8)
                 blur = cv2.blur(mask, (5,5))
                 erosion = cv2.erode(blur, kernel, iterations=1)
-                #dilation = cv2.dilate(erosion, kernel, iterations=1)
 
                 res = cv2.bitwise_and(crop_img, crop_img, mask=erosion)
 
@@ -108,7 +131,7 @@ class Task2(ThymioController):
 
                 if len(contours) == 0:
                     print("I can't see anything, help me") #do the same action 
-                elif len(contours) == 1:
+                elif len(contours) == 1 and len(black_contours) == 0:
                     # draw contours
                     cv2.drawContours(res, contours[0], -1, (0, 255, 0), 3)
 
@@ -147,13 +170,13 @@ class Task2(ThymioController):
                         self.vel_msg.linear.x = .12 * self.speed
                         self.vel_msg.angular.z = .2 * boost
 
-                elif len(contours) > 1:
+                elif len(contours) > 0 and len(black_contours) > 0:
 
                     # draw contours left
-                    cv2.drawContours(res, contours[0], -1, (0, 255, 0), 3)
+                    cv2.drawContours(res, black_contours[0], -1, (0, 255, 0), 3)
 
                     # calculate centroid from left
-                    m = cv2.moments(contours[0], False)
+                    m = cv2.moments(black_contours[0], False)
                     try:
                         cx1, cy1 = int(m['m10'] / m['m00']), int(m['m01'] / m['m00'])
                     except ZeroDivisionError: #if we don't detect anything
@@ -163,10 +186,10 @@ class Task2(ThymioController):
                     cv2.circle(res, (cx1, cy1), 5, (0,0,255), -1)
 
                     # draw contours right
-                    cv2.drawContours(res, contours[1], -1, (0, 255, 0), 3)
+                    cv2.drawContours(res, contours[0], -1, (0, 255, 0), 3)
 
                     # calculate centroid from right
-                    m = cv2.moments(contours[1], False)
+                    m = cv2.moments(contours[0], False)
                     try:
                         cx2, cy2 = int(m['m10'] / m['m00']), int(m['m01'] / m['m00'])
                     except ZeroDivisionError: #if we don't detect anything
@@ -179,8 +202,11 @@ class Task2(ThymioController):
                     centerx, centery = int((cx1+cx2)/2), int((cy1+cy2)/2)
                     cv2.circle(res, (centerx, centery), 10, (0,0,255), -1)
 
-
-                    if int(width/2) - centerx > 10:
+                    if centery < 25:
+                        print("crossroads")
+                        self.vel_msg.linear.x = .1 * self.speed
+                        self.vel_msg.angular.z = 0
+                    elif int(width/2) - centerx > 10:
                         print("turn left")
                         self.vel_msg.linear.x = .15 * self.speed
                         self.vel_msg.angular.z = .1
@@ -202,10 +228,10 @@ class Task2(ThymioController):
             cv2.imshow("Blur", blur)
             cv2.imshow("Erosion", erosion)
             #cv2.imshow("Dilation", dilation)
+            cv2.imshow("Original", self.cv_image)
             cv2.imshow("HSV", hsv)
             cv2.imshow("Mask", mask)
             '''
-            cv2.imshow("Original", self.cv_image)
             cv2.imshow("Res", res)
             cv2.waitKey(1) # you must put in pause gazebo
         
