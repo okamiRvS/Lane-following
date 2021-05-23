@@ -3,16 +3,22 @@ import rospy
 from thymio import ThymioController, PID
 from sensor_msgs.msg import Range, Image
 import pdb
+from nav_msgs.msg import Odometry
+from sensor_msgs.msg import Range
+from geometry_msgs.msg import Pose, Twist, Vector3
 
 import cv2
 import numpy as np
 from cv_bridge import CvBridge, CvBridgeError # this is necessary to work with images in ROS
 
-class Task2(ThymioController):
+class Task2:
 
     def __init__(self):
-        super(Task2, self).__init__()
-
+        #super(Task2, self).__init__()
+        rospy.init_node(
+            'thymio_controller'  # name of the node
+        )
+        self.name = rospy.get_param('~robot_name')
         self.bridge_object = CvBridge()
 
         # pitch camera: 0.076417
@@ -21,11 +27,21 @@ class Task2(ThymioController):
         # rostopic echo -n1 /thymio10/camera/image_raw/width
         # rostopic echo -n1 /thymio10/camera/image_raw/encoding
         # rostopic echo -n1 /thymio10/camera/image_raw/data
-
-        self.image_sub = rospy.Subscriber("/thymio10/camera/image_raw", Image, self.camera_callback)
+        self.rate = rospy.Rate(10)
+        print(self.name)
+        self.image_sub = rospy.Subscriber(self.name +"/camera/image_raw", Image, self.camera_callback)
+        self.frontsensor_sub = rospy.Subscriber(self.name + '/proximity/center', Range, self.set_proximity)
         self.cv_image = None
         self.speed = 1
+        self.prox = 0.12
         self.onmarking = False
+        self.pose = Pose()
+        self.vel_msg = Twist()
+        self.velocity_publisher = rospy.Publisher(
+            self.name + '/cmd_vel',  # name of the topic
+            Twist,  # message type
+            queue_size=1  # queue size
+        )
 
     def camera_callback(self, data):
         try:
@@ -35,10 +51,12 @@ class Task2(ThymioController):
         except CvBridgeError as e:
             print(e)
         
+    def set_proximity(self, data):
+        self.prox = data.range
 
     def run(self):
         while not rospy.is_shutdown():
-            self.sleep()
+            self.rate.sleep()
             if self.cv_image is not None:
                 break
         self.lastspeedupdate = rospy.Time.now().to_nsec() - 10**9
@@ -219,6 +237,11 @@ class Task2(ThymioController):
                         self.vel_msg.linear.x = .2 * self.speed
                         self.vel_msg.angular.z = 0
 
+                #stop if object in front
+                if self.prox < 0.11:
+                    self.vel_msg.linear.x = 0
+                    self.vel_msg.angular.z = 0
+
                 self.velocity_publisher.publish(self.vel_msg)
 
             except CvBridgeError as e:
@@ -235,7 +258,7 @@ class Task2(ThymioController):
             cv2.imshow("Res", res)
             cv2.waitKey(1) # you must put in pause gazebo
         
-            self.sleep()
+            self.rate.sleep()
 
         self.stop()
 
