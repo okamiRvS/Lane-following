@@ -107,7 +107,7 @@ class Task2(ThymioController):
                     self.direction = -1
                 if sum(sum(mask_orange > 1)) > 2500:
                     self.arrownonecount = 0
-                    cv2.imwrite('/home/usiusi/catkin_ws/test.jpg', self.cv_image)
+                    #cv2.imwrite('/home/usiusi/catkin_ws/test.jpg', self.cv_image)
                     ret, thresh = cv2.threshold(mask_orange, 127, 255, 0)
                     contours, hierarchy = cv2.findContours(thresh, 1, 2)
                     cnt = contours[0]
