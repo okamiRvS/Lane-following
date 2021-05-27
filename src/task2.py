@@ -12,6 +12,8 @@ import cv2
 import numpy as np
 from cv_bridge import CvBridge, CvBridgeError # this is necessary to work with images in ROS
 
+import math
+
 class Task2(ThymioController):
 
     def __init__(self):
@@ -32,6 +34,8 @@ class Task2(ThymioController):
         self.prox = 0.12
         self.onmarking = False
         self.last_state = None
+        self.arrowvote = [0,0,0]
+        self.arrownonecount = 0
 
     def camera_callback(self, data):
         try:
@@ -87,6 +91,45 @@ class Task2(ThymioController):
                 if self.onmarking and np.sum(mask_red) ==0 and np.sum(mask_green) ==0:
                     self.onmarking = False
 
+
+                #detect arrows
+                RGB_orange = [220, 175, 59]
+                BGR_orange = np.uint8([[[RGB_orange[2], RGB_orange[1], RGB_orange[0]]]])
+                HSV_orange = cv2.cvtColor(BGR_orange, cv2.COLOR_BGR2HSV)[0][0]
+                lower_orange = np.array([HSV_orange[0] - 15, 120, 120])
+                upper_orange = np.array([HSV_orange[0] + 15, 255, 255])
+                crop_img_low = self.cv_image[height - 150::, int(width / 2) - 150:int(width / 2) + 150]
+                hsv_low = cv2.cvtColor(crop_img_low, cv2.COLOR_BGR2HSV)
+                mask_orange = cv2.inRange(hsv_low, lower_orange, upper_orange)
+                if max(self.arrowvote) > 10:
+                    self.direction = np.argmax(self.arrowvote)
+                else:
+                    self.direction = -1
+                if sum(sum(mask_orange > 1)) > 250:
+                    self.arrownonecount = 0
+                    print(sum(sum(mask_orange > 1)))
+                    cv2.imwrite('/home/usiusi/catkin_ws/test.jpg', self.cv_image)
+                    ret, thresh = cv2.threshold(mask_orange, 127, 255, 0)
+                    contours, hierarchy = cv2.findContours(thresh, 1, 2)
+                    cnt = contours[0]
+                    M = cv2.moments(cnt)
+                    cx = M['m10'] / (M['m00']+1)
+                    cy = M['m01'] / (M['m00']+1)
+                    meanx = np.min(cnt[:, :, 0]) + (np.max(cnt[:, :, 0]) - np.min(cnt[:, :, 0]))/2
+                    meany = np.min(cnt[:, :, 1]) + (np.max(cnt[:, :, 1])- np.min(cnt[:, :, 1]))/2
+                    ang = math.degrees(math.atan2(cy - meany, cx - meanx))
+                    print(ang)
+                    if ((cy - meany)**2 + (cx - meanx)**2)**0.5 > 4:
+                        if abs(ang) < 15:
+                            self.arrowvote[0] += 1
+                        if ang > 165 or ang < -165:
+                            self.arrowvote[2] += 1
+                        if abs(ang) > 60 and abs(ang) < 130:
+                            self.arrowvote[1] += 1
+                else:
+                    if self.arrownonecount > 20:
+                        self.arrowvote = [0,0,0]
+                    self.arrownonecount += 1
                 ###################
 
                 # convert RGB black to BGR black
@@ -303,7 +346,7 @@ class Task2(ThymioController):
 
             except CvBridgeError as e:
                 print(e)
-
+            cv2.imshow("Test",mask_orange)
             '''
             cv2.imshow("Blur", blur)
             cv2.imshow("Erosion", erosion)
