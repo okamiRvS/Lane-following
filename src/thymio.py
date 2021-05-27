@@ -10,7 +10,7 @@ class ThymioController(object):
 
     def __init__(self):
         rospy.init_node('thymio_controller', anonymous=True)
-        self.name = rospy.get_param('~name')
+        self.name = rospy.get_param('~robot_name')
         self.velocity_publisher = rospy.Publisher(f"/{self.name}/cmd_vel", Twist, queue_size=10)
         self.pose_subscriber = rospy.Subscriber(f"/{self.name}/odom", Odometry, self.log_odometry)
         self.pose = Pose2D()
@@ -20,7 +20,7 @@ class ThymioController(object):
         self.rate = rospy.Rate(frequency)
         self.step = rospy.Duration.from_sec(1.0 / frequency)
 
-    def human_readable_pose2d(self, pose):
+    def quaternion2pose(self, pose):
         #Return pose2D
         quaternion = (
             pose.orientation.x,
@@ -34,7 +34,12 @@ class ThymioController(object):
     def log_odometry(self, data):
         #Pose and velocities update
         self.vel_msg = data.twist.twist
-        self.pose = self.human_readable_pose2d(data.pose.pose)
+        self.pose = self.quaternion2pose(data.pose.pose)
+
+        rospy.loginfo_throttle(
+            period=5, #log every 10 seconds
+            msg= f"{self.name} ({self.pose.x} {self.pose.y} {self.pose.y} {self.pose.theta})"
+        )
 
     def euclidean_distance(self, goal_pose, current_pose):
         #Return Euclidean distance between current pose and the goal pose

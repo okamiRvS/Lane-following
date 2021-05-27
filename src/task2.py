@@ -2,6 +2,7 @@
 import rospy
 from thymio import ThymioController, PID
 from sensor_msgs.msg import Range, Image
+
 import pdb
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Range
@@ -11,14 +12,10 @@ import cv2
 import numpy as np
 from cv_bridge import CvBridge, CvBridgeError # this is necessary to work with images in ROS
 
-class Task2:
+class Task2(ThymioController):
 
     def __init__(self):
-        #super(Task2, self).__init__()
-        rospy.init_node(
-            'thymio_controller'  # name of the node
-        )
-        self.name = rospy.get_param('~robot_name')
+        super(Task2, self).__init__()
         self.bridge_object = CvBridge()
 
         # pitch camera: 0.076417
@@ -27,7 +24,6 @@ class Task2:
         # rostopic echo -n1 /thymio10/camera/image_raw/width
         # rostopic echo -n1 /thymio10/camera/image_raw/encoding
         # rostopic echo -n1 /thymio10/camera/image_raw/data
-        self.rate = rospy.Rate(10)
         print(self.name)
         self.image_sub = rospy.Subscriber(self.name +"/camera/image_raw", Image, self.camera_callback)
         self.frontsensor_sub = rospy.Subscriber(self.name + '/proximity/center', Range, self.set_proximity)
@@ -35,13 +31,7 @@ class Task2:
         self.speed = 1
         self.prox = 0.12
         self.onmarking = False
-        self.pose = Pose()
-        self.vel_msg = Twist()
-        self.velocity_publisher = rospy.Publisher(
-            self.name + '/cmd_vel',  # name of the topic
-            Twist,  # message type
-            queue_size=1  # queue size
-        )
+        self.last_state = None
 
     def camera_callback(self, data):
         try:
@@ -56,7 +46,7 @@ class Task2:
 
     def run(self):
         while not rospy.is_shutdown():
-            self.rate.sleep()
+            self.sleep()
             if self.cv_image is not None:
                 break
         self.lastspeedupdate = rospy.Time.now().to_nsec() - 10**9
@@ -147,8 +137,57 @@ class Task2:
                 # find contours
                 contours, hierarchy = cv2.findContours(erosion, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-                if len(contours) == 0:
-                    print("I can't see anything, help me") #do the same action 
+                if len(contours) == 0 and len(black_contours) == 0:
+                    current_state = "I can't see anything, help me"
+                    if self.last_state != current_state:
+                        self.last_state = current_state
+                        print(current_state) #do the same action done before
+                    
+                elif len(contours) == 0 and len(black_contours) == 1:
+                    # draw contours
+                    cv2.drawContours(res, black_contours[0], -1, (0, 255, 0), 3)
+
+                    points = np.zeros((len(black_contours[0]), 2), dtype=np.uint16)
+                    for idx, point in enumerate(black_contours[0]):
+                        points[idx] = point[0]
+
+                    # point with higher y coordinate
+                    orientationPoint = points[np.argsort(points[:,1])[0]]
+
+                    #draw the orientationPoint
+                    cv2.circle(res, (orientationPoint[0], orientationPoint[1]), 5, (0,200,255), -1)
+
+                    # calculate centroid
+                    m = cv2.moments(black_contours[0], False)
+                    try:
+                        cx1, cy1 = int(m['m10'] / m['m00']), int(m['m01'] / m['m00'])
+                    except ZeroDivisionError: #if we don't detect anything
+                        cx1, cy1 = (int(cropxSize/2), int(width/2)) #center of the image
+
+                    # draw the centroid of the line
+                    cv2.circle(res, (cx1, cy1), 5, (0,0,255), -1)
+
+                    # if we are at the end of the curve boost a little bit
+                    # let's see the amount of pixel of the curve where they are
+                    boost = 1
+                    if len(points) == len(points[points[:,0] < int(width/2)]):
+                        boost = 2
+
+                    if cx1 - orientationPoint[0] < 0:
+                        current_state = "Turn right"
+                        if self.last_state != current_state:
+                            self.last_state = current_state
+                            print(current_state)
+                        self.vel_msg.linear.x = .12 * self.speed
+                        self.vel_msg.angular.z = -.2 * boost
+                    elif cx1 - orientationPoint[0] >= 0:
+                        current_state = "Turn left"
+                        if self.last_state != current_state:
+                            self.last_state = current_state
+                            print(current_state)
+                        self.vel_msg.linear.x = .12 * self.speed
+                        self.vel_msg.angular.z = .2 * boost
+
                 elif len(contours) == 1 and len(black_contours) == 0:
                     # draw contours
                     cv2.drawContours(res, contours[0], -1, (0, 255, 0), 3)
@@ -180,11 +219,17 @@ class Task2:
                         boost = 2
 
                     if cx1 - orientationPoint[0] < 0:
-                        print("turn right")
+                        current_state = "Turn right"
+                        if self.last_state != current_state:
+                            self.last_state = current_state
+                            print(current_state)
                         self.vel_msg.linear.x = .12 * self.speed
                         self.vel_msg.angular.z = -.2 * boost
                     elif cx1 - orientationPoint[0] >= 0:
-                        print("turn left")
+                        current_state = "Turn left"
+                        if self.last_state != current_state:
+                            self.last_state = current_state
+                            print(current_state)
                         self.vel_msg.linear.x = .12 * self.speed
                         self.vel_msg.angular.z = .2 * boost
 
@@ -221,19 +266,31 @@ class Task2:
                     cv2.circle(res, (centerx, centery), 10, (0,0,255), -1)
 
                     if centery < 25:
-                        print("crossroads")
+                        current_state = "Crossroads"
+                        if self.last_state != current_state:
+                            self.last_state = current_state
+                            print(current_state)
                         self.vel_msg.linear.x = .1 * self.speed
                         self.vel_msg.angular.z = 0
                     elif int(width/2) - centerx > 10:
-                        print("turn left")
+                        current_state = "Turn left"
+                        if self.last_state != current_state:
+                            self.last_state = current_state
+                            print(current_state)
                         self.vel_msg.linear.x = .15 * self.speed
                         self.vel_msg.angular.z = .1
                     elif int(width/2) - centerx < -10:
-                        print("turn right")
+                        current_state = "Turn right"
+                        if self.last_state != current_state:
+                            self.last_state = current_state
+                            print(current_state)
                         self.vel_msg.linear.x = .15 * self.speed
                         self.vel_msg.angular.z = -.1
                     else:
-                        print("I'm in the center")
+                        current_state = "I'm in the center"
+                        if self.last_state != current_state:
+                            self.last_state = current_state
+                            print(current_state)
                         self.vel_msg.linear.x = .2 * self.speed
                         self.vel_msg.angular.z = 0
 
@@ -254,11 +311,11 @@ class Task2:
             cv2.imshow("Original", self.cv_image)
             cv2.imshow("HSV", hsv)
             cv2.imshow("Mask", mask)
-            '''
             cv2.imshow("Res", res)
             cv2.waitKey(1) # you must put in pause gazebo
+            '''
         
-            self.rate.sleep()
+            self.sleep()
 
         self.stop()
 
