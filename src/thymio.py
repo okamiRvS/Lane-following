@@ -36,10 +36,12 @@ class ThymioController(object):
         self.vel_msg = data.twist.twist
         self.pose = self.quaternion2pose(data.pose.pose)
 
+        '''
         rospy.loginfo_throttle(
             period=5, #log every 10 seconds
             msg= f"{self.name} ({self.pose.x} {self.pose.y} {self.pose.y} {self.pose.theta})"
         )
+        '''
 
     def euclidean_distance(self, goal_pose, current_pose):
         #Return Euclidean distance between current pose and the goal pose

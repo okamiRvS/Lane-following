@@ -15,7 +15,7 @@
         <arg name="right_wheel_friction" value="1"/>
 
         <arg name="camera_is_fixed" default="false"/>
-        <arg name="camera_pitch" default="0.3018"/>
+        <arg name="camera_pitch" default="0.2"/>
 
         <arg name="proximity_max_range" default="0.12"/>
         <arg name="proximity_resolution" default="0.005"/>
@@ -23,7 +23,7 @@
     </include>
 
     <node name="task2" pkg="ros-streetwalk" type="task2.py" output="screen">
-    	<param name="robot_name" value="$(arg robot_name)" />
+    	<param name="robot_name" value="thymio10" />
     </node>
    
 </launch>

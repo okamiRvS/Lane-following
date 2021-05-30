@@ -37,6 +37,13 @@ class Task2(ThymioController):
         self.arrowvote = [0,0,0]
         self.arrownonecount = 0
 
+        # to handle the time to do the action
+        self.timeCrossroad = 0
+        # lock time 
+        self.flag = True
+        # no direction in praticular
+        self.direction = -1
+
     def camera_callback(self, data):
         try:
             # bgr8 cause its the default OpenCV encoding
@@ -54,6 +61,7 @@ class Task2(ThymioController):
             if self.cv_image is not None:
                 break
         self.lastspeedupdate = rospy.Time.now().to_nsec() - 10**9
+
         while not rospy.is_shutdown():           
             try:
                 # crop the image to make process much faster
@@ -133,6 +141,109 @@ class Task2(ThymioController):
                     if self.arrownonecount > 15:
                         self.arrowvote = [0,0,0]
                     self.arrownonecount += 1
+
+                # Set timer
+                if self.flag:
+                    if self.direction == 2:
+                        self.timeCrossroad = rospy.get_time() + rospy.Time(6).secs
+                        print(f"self.timeCrossroad: {self.timeCrossroad}")
+                        self.flag = False
+                    elif self.direction == 1:
+                        self.timeCrossroad = rospy.get_time() + rospy.Time(6).secs
+                        print(f"self.timeCrossroad: {self.timeCrossroad}")
+                        self.flag = False
+                    elif self.direction == 0:
+                        self.timeCrossroad = rospy.get_time() + rospy.Time(5).secs
+                        print(f"self.timeCrossroad: {self.timeCrossroad}")
+                        self.flag = False
+
+                # Make action based on arrows
+                while not rospy.is_shutdown():
+                    if self.direction == 2:
+                        #print(f"rospy.get_rostime().secs: {rospy.get_rostime().secs}")
+
+                        # exit from action if the time is finished
+                        if self.timeCrossroad < rospy.get_rostime().secs:
+                            self.flag = True
+                            self.direction = -1
+                            self.arrowvote = [0,0,0]
+                            print("Exit from timeCrossroad")
+                            break
+
+                        if self.timeCrossroad - rospy.Time(5).secs < rospy.get_rostime().secs:
+                            # Start the movement
+                            current_state = "Crossroad, Turn left"
+                            if self.last_state != current_state:
+                                self.last_state = current_state
+                                print(f"current_state: {current_state}")
+                                
+
+                            self.vel_msg.linear.x = .15
+                            self.vel_msg.angular.z = .35
+                            self.velocity_publisher.publish(self.vel_msg)
+                        else:
+                            # Wait two seconds before starting
+                            current_state = "Detect the right arrow, wait"
+                            if self.last_state != current_state:
+                                self.last_state = current_state
+                                print(f"current_state: {current_state}")
+ 
+                        self.sleep()
+                    elif self.direction == 1:
+                        #print(f"rospy.get_rostime().secs: {rospy.get_rostime().secs}")
+
+                        # exit from action if the time is finished
+                        if self.timeCrossroad < rospy.get_rostime().secs:
+                            self.flag = True
+                            self.direction = -1
+                            self.arrowvote = [0,0,0]
+                            print("Exit from timeCrossroad")
+                            break                               
+                        else:
+                            self.vel_msg.linear.x = .2 * self.speed
+                            self.vel_msg.angular.z = 0
+                            self.velocity_publisher.publish(self.vel_msg)
+                            # Wait two seconds before starting
+                            current_state = "Detect the straight ahead arrow, wait"
+                            if self.last_state != current_state:
+                                self.last_state = current_state
+                                print(f"current_state: {current_state}")
+ 
+                        self.sleep()
+                    elif self.direction == 0:
+                        #print(f"rospy.get_rostime().secs: {rospy.get_rostime().secs}")
+
+                        # exit from action if the time is finished
+                        if self.timeCrossroad < rospy.get_rostime().secs:
+                            self.flag = True
+                            self.direction = -1
+                            self.arrowvote = [0,0,0]
+                            print("Exit from timeCrossroad")
+                            break
+
+                        if self.timeCrossroad - rospy.Time(4).secs < rospy.get_rostime().secs:
+                            # Start the movement
+                            current_state = "Crossroad, Turn right"
+                            if self.last_state != current_state:
+                                self.last_state = current_state
+                                print(f"current_state: {current_state}")
+                                
+
+                            self.vel_msg.linear.x = .1
+                            self.vel_msg.angular.z = -.4
+                            self.velocity_publisher.publish(self.vel_msg)
+                        else:
+                            # Wait two seconds before starting
+                            current_state = "Detect the right arrow, wait"
+                            if self.last_state != current_state:
+                                self.last_state = current_state
+                                print(f"current_state: {current_state}")
+ 
+                        self.sleep()
+                    else:
+                        break
+      
+
                 ###################
 
                 # convert RGB black to BGR black
@@ -357,9 +468,9 @@ class Task2(ThymioController):
             cv2.imshow("Original", self.cv_image)
             cv2.imshow("HSV", hsv)
             cv2.imshow("Mask", mask)
+            '''
             cv2.imshow("Res", res)
             cv2.waitKey(1) # you must put in pause gazebo
-            '''
         
             self.sleep()
 

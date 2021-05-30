@@ -10,7 +10,7 @@ rqt
 
 ```sh
 roslaunch ros-streetwalk run.launch world:=street
-roslaunch ros-streetwalk task2.launch robot_name:=thymio10
+roslaunch ros-streetwalk task2.launch
 rqt
 ```
 
