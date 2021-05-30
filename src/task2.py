@@ -101,13 +101,14 @@ class Task2(ThymioController):
                 crop_img_low = self.cv_image[height - 150::, int(width / 2) - 150:int(width / 2) + 150]
                 hsv_low = cv2.cvtColor(crop_img_low, cv2.COLOR_BGR2HSV)
                 mask_orange = cv2.inRange(hsv_low, lower_orange, upper_orange)
-                if max(self.arrowvote) > 3:
+                if max(self.arrowvote) > 2:
                     self.direction = np.argmax(self.arrowvote)
+                    print("Arrow" + str(self.direction))
                 else:
                     self.direction = -1
-                if sum(sum(mask_orange > 1)) > 2500:
+                if sum(sum(mask_orange > 1)) > 2000:
                     self.arrownonecount = 0
-                    #cv2.imwrite('/home/usiusi/catkin_ws/test.jpg', self.cv_image)
+                    cv2.imwrite('/home/usiusi/catkin_ws/test'+str(sum(sum(mask_orange > 1)))+'.jpg', self.cv_image)
                     ret, thresh = cv2.threshold(mask_orange, 127, 255, 0)
                     contours, hierarchy = cv2.findContours(thresh, 1, 2)
                     cnt = contours[0]
@@ -119,14 +120,17 @@ class Task2(ThymioController):
                     ang = math.degrees(math.atan2(cy - meany, cx - meanx))
                     print(ang)
                     if ((cy - meany)**2 + (cx - meanx)**2)**0.5 > 4:
+                        #right
                         if abs(ang) < 15:
                             self.arrowvote[0] += 1
+                        #straight
                         if ang > 165 or ang < -165:
                             self.arrowvote[2] += 1
+                        #left
                         if abs(ang) > 60 and abs(ang) < 130:
                             self.arrowvote[1] += 1
                 else:
-                    if self.arrownonecount > 5:
+                    if self.arrownonecount > 15:
                         self.arrowvote = [0,0,0]
                     self.arrownonecount += 1
                 ###################
