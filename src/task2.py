@@ -57,20 +57,6 @@ class Task2(ThymioController):
     def set_proximity(self, data):
         self.prox = data.range
 
-    def fixRadiusFromView(self, shape):
-        height, width = shape
-        gridDensity = 5
-        cells = height / gridDensity
-        within = self.centroidArrow[1] / cells
-
-        radius = 0.6 - (within **2 / 100) - (self.speed / 20)
-        print(radius)
-
-        if radius < 0:
-            0.1
-
-        return radius
-
     def run(self):
         while not rospy.is_shutdown():
             self.sleep()
@@ -121,6 +107,7 @@ class Task2(ThymioController):
                 if self.onmarking and np.sum(mask_red) ==0 and np.sum(mask_green) ==0:
                     self.onmarking = False
 
+                #print(self.speed)
 
                 #detect arrows
                 RGB_orange = [220, 175, 59]
@@ -180,16 +167,66 @@ class Task2(ThymioController):
                         print(f"self.timeCrossroad: {self.timeCrossroad}")
                         self.flag = False
                     elif self.direction == 0:   # TURN RIGTH
-                        self.timeCrossroad = rospy.get_time() + rospy.Time(4.5).secs
-                        print(f"self.timeCrossroad: {self.timeCrossroad}")
+                        # self.timeCrossroad = rospy.get_time() + rospy.Time(4.5).secs
+                        # print(f"self.timeCrossroad: {self.timeCrossroad}")
                         self.flag = False
                     
-                print(self.speed)
-
                 # Make action based on arrows
                 while not rospy.is_shutdown():
 
                     if self.direction == 2:
+
+                        ###########################
+                        final_angle = Pose2D()
+                        final_angle.theta = self.pose.theta + math.pi/2
+
+                        self.radius = 1.5 * (0.6375426 + -0.0925077999*self.speed + -4.04923783e-05*self.centroidArrow[1])
+                        #self.radius = 0.75
+                        self.period = 30
+
+                        pixelCoordinate = self.centroidArrow[1]
+                        print("Speed, pixelCoordinate, Radius")
+                        print(f"{self.speed},{pixelCoordinate},{self.radius}")
+
+                        # Sleep until the first time update is received
+                        self.sleep()
+
+                        start_time = rospy.Time.now()
+                        estimated_pose = None
+
+                        count = 0
+                        while not rospy.is_shutdown():
+                            elapsed_time = rospy.Time.now() - start_time
+
+                            next_time = (elapsed_time + self.step).to_sec()
+
+                            next_pose = self.compute_pose(next_time)
+
+                            print(f"Iteration {count}: {self.angular_difference(self.pose, final_angle)}")
+
+                            if abs(self.angular_difference(self.pose, final_angle)) > 0.05:
+                                if estimated_pose is not None:
+                                    self.vel_msg.linear.x = self.linear_vel(next_pose, estimated_pose)
+                                    self.vel_msg.angular.z = self.angular_vel(next_pose, estimated_pose)
+
+                                    self.velocity_publisher.publish(self.vel_msg)
+
+                                    self.sleep()
+                                    count += 1
+                            else:
+                                break
+
+                            estimated_pose = next_pose
+
+                        self.flag = True
+                        self.direction = -1
+                        self.arrowvote = [0,0,0]
+                        print("Right curve movement done")
+                        break
+                        ###########################
+
+
+                        '''
                         #print(f"rospy.get_rostime().secs: {rospy.get_rostime().secs}")
 
                         # exit from action if the time is finished
@@ -218,6 +255,7 @@ class Task2(ThymioController):
                                 print(f"current_state: {current_state}")
  
                         self.sleep()
+                        '''
 
                     elif self.direction == 1:
 
@@ -244,18 +282,17 @@ class Task2(ThymioController):
                         self.sleep()
                         
                     elif self.direction == 0:
-                        
-                        # print(self.centroidArrow)
-                        # print(self.speed) # DA TOGLIERE
-                        # self.stop()
-       
-                        final_angle = Pose2D()
-                        final_angle.theta = self.pose.theta -  math.pi/2
-
+                                
                         ###########################
-                        self.radius = self.fixRadiusFromView(mask_orange.shape, )
-                        self.radius = self.radius - (self.speed / 20)
+                        final_angle = Pose2D()
+                        final_angle.theta = self.pose.theta - math.pi/2
+
+                        self.radius = 0.6375426 + -0.0925077999*self.speed + -4.04923783e-05*self.centroidArrow[1]
                         self.period = 30
+
+                        pixelCoordinate = self.centroidArrow[1]
+                        print("Speed, pixelCoordinate, Radius")
+                        print(f"{self.speed},{pixelCoordinate},{self.radius}")
 
                         # Sleep until the first time update is received
                         self.sleep()
@@ -263,6 +300,7 @@ class Task2(ThymioController):
                         start_time = rospy.Time.now()
                         estimated_pose = None
 
+                        count = 0
                         while not rospy.is_shutdown():
                             elapsed_time = rospy.Time.now() - start_time
 
@@ -270,7 +308,9 @@ class Task2(ThymioController):
 
                             next_pose = self.compute_pose(next_time)
 
-                            if self.angular_difference(self.pose, final_angle) <= 0.01:
+                            print(f"Iteration {count}: {self.angular_difference(self.pose, final_angle)}")
+
+                            if abs(self.angular_difference(self.pose, final_angle)) > 0.05:
                                 if estimated_pose is not None:
                                     self.vel_msg.linear.x = self.linear_vel(next_pose, estimated_pose)
                                     self.vel_msg.angular.z = -self.angular_vel(next_pose, estimated_pose)
@@ -278,6 +318,7 @@ class Task2(ThymioController):
                                     self.velocity_publisher.publish(self.vel_msg)
 
                                     self.sleep()
+                                    count += 1
                             else:
                                 break
 
@@ -286,7 +327,7 @@ class Task2(ThymioController):
                         self.flag = True
                         self.direction = -1
                         self.arrowvote = [0,0,0]
-                        print("Exit from timeCrossroad")
+                        print("Left curve movement done")
                         break
                         ###########################
 
@@ -524,6 +565,8 @@ class Task2(ThymioController):
                         # draw the center of the lines
                         centerx, centery = int((cx1+cx2)/2), int((cy1+cy2)/2)
                         cv2.circle(res, (centerx, centery), 10, (0,0,255), -1)
+
+                        #self.speed = 2.0
 
                         if int(width/2) - centerx > 10:
                             current_state = "Turn left"
