@@ -4,6 +4,7 @@ from math import *
 import tf
 from geometry_msgs.msg import Pose2D, Twist
 from nav_msgs.msg import Odometry
+import pdb
 
 
 class ThymioController(object):
@@ -21,6 +22,7 @@ class ThymioController(object):
         self.step = rospy.Duration.from_sec(1.0 / frequency)
 
     def quaternion2pose(self, pose):
+
         #Return pose2D
         quaternion = (
             pose.orientation.x,
@@ -71,6 +73,21 @@ class ThymioController(object):
     def stop(self):
         self.velocity_publisher.publish(Twist())
         self.sleep()
+        pdb.set_trace()
+
+    def compute_pose(self, time_delta):
+        progress = ((2 * pi) / self.period) * time_delta
+
+        x = self.radius * sin(progress) * cos(progress)
+        y = self.radius * sin(progress)
+
+        dx = self.radius * (cos(progress) ** 2 - sin(progress) ** 2)
+        dy = self.radius * cos(progress)
+        theta = atan2(dy, dx)
+
+        pose = Pose2D(x, y, theta)
+
+        return pose
 
 
 class PID:
