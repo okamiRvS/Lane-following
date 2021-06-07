@@ -1,4 +1,4 @@
-# ros-streetwalk
+# Lane-following
 > Final project of Robotics course. 
 > 
 > @ USI 20/21.
