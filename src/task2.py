@@ -35,6 +35,7 @@ class Task2(ThymioController):
         self.last_state = None
         self.arrowvote = [0,0,0]
         self.arrownonecount = 0
+        self.flag_start = True
 
         # to handle the time to do the action
         self.timeCrossroad = 0
@@ -72,11 +73,33 @@ class Task2(ThymioController):
         while not rospy.is_shutdown():           
             try:
 
-                # crop the image to make process much faster
-                height, width, channels = self.cv_image.shape
-                cropxSize = 100
-                crop_img = self.cv_image[height-cropxSize-25:height-25:,:]
+                # if self.name == "thymio11":
+                #     while not rospy.is_shutdown():
+                #         self.vel_msg.linear.x = 2
+                #         self.vel_msg.angular.z = 0
+                #         print(self.vel_msg)
+                #         self.velocity_publisher.publish(self.vel_msg)
+                #         self.sleep()
                 
+
+                # issue at the beginning, let's try to handle it
+                while not rospy.is_shutdown():
+                    # crop the image to make process much faster
+                    height, width, channels = self.cv_image.shape
+                    cropxSize = 100
+                    crop_img = self.cv_image[height-cropxSize-25:height-25:,:]
+                    
+
+                    if self.flag_start and (174 < crop_img.mean() < 180):
+                        current_state = "Waiting for an object to be initialized..."
+                        if self.last_state != current_state:
+                            self.last_state = current_state
+                            print(f"current_state: {current_state}")
+                            self.sleep()
+                    else:
+                        self.flag_start = False
+                        break
+                    
                 #detect lines
                 RGB_green = [0,176,80]
                 BGR_green = np.uint8([[[RGB_green[2], RGB_green[1], RGB_green[0]]]])
@@ -127,7 +150,7 @@ class Task2(ThymioController):
                     self.direction = -1
                 if sum(sum(mask_orange > 1)) > 2000:
                     self.arrownonecount = 0
-                    cv2.imwrite('/home/usiusi/catkin_ws/test'+str(sum(sum(mask_orange > 1)))+'.jpg', self.cv_image)
+                    #cv2.imwrite('/home/usiusi/catkin_ws/test'+str(sum(sum(mask_orange > 1)))+'.jpg', self.cv_image)
                     ret, thresh = cv2.threshold(mask_orange, 127, 255, 0)
                     contours, hierarchy = cv2.findContours(thresh, 1, 2)
                     cnt = contours[0]
@@ -599,8 +622,8 @@ class Task2(ThymioController):
 
             except CvBridgeError as e:
                 print(e)
-            cv2.imshow("Test",mask_orange)
             '''
+            cv2.imshow("Test",mask_orange)
             cv2.imshow("Blur", blur)
             cv2.imshow("Erosion", erosion)
             #cv2.imshow("Dilation", dilation)
@@ -608,6 +631,7 @@ class Task2(ThymioController):
             cv2.imshow("HSV", hsv)
             cv2.imshow("Mask", mask)
             '''
+
             cv2.imshow("Res", res)
             cv2.waitKey(1)
         

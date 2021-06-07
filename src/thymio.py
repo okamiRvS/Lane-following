@@ -6,7 +6,6 @@ from geometry_msgs.msg import Pose2D, Twist
 from nav_msgs.msg import Odometry
 import pdb
 
-
 class ThymioController(object):
 
     def __init__(self):
@@ -73,7 +72,7 @@ class ThymioController(object):
     def stop(self):
         self.velocity_publisher.publish(Twist())
         self.sleep()
-        pdb.set_trace()
+        #pdb.set_trace()
 
     def compute_pose(self, time_delta):
         progress = ((2 * pi) / self.period) * time_delta
