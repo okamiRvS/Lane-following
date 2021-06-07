@@ -12,14 +12,14 @@ Video folder: https://drive.google.com/drive/folders/18hJCJqRr_7hdL7yg20SW_annQd
 The files in Gazebo11 have to be copied and merged to the Gazebo folder located e.g. at /usr/share/gazebo-11
 
 #### Commands
-```sh
 Single Thymio:
+```sh
 roslaunch ros-streetwalk run.launch world:=street
 roslaunch ros-streetwalk task2.launch
 ```
 
-```sh
 Multiple Thymio:
+```sh
 roslaunch ros-streetwalk run.launch world:=street
 roslaunch ros-streetwalk task3.launch
 ```
