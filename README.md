@@ -23,3 +23,5 @@ Multiple Thymio:
 roslaunch ros-streetwalk run.launch world:=street
 roslaunch ros-streetwalk task3.launch
 ```
+
+If there are problems with the pitch camera, close the task.launch (not Gazebo) and try to run again this last script.
